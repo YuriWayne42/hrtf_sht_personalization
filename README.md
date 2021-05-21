@@ -2,4 +2,15 @@
 
 Authors: Yuxiang Wang, You Zhang, Zhiyao Duan, Mark Bocko
 
-Code will be availble here.
+## Basic information
+Dataset HUTUBS [download here]
+Programming: MATLAB, Python (Pytorch)
+
+## Preprocessing with SHT
+
+## Deep learning model
+### Dependencies
+
+### Train the model
+
+### Test the pretrained model
