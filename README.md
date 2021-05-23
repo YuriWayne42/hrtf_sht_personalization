@@ -8,7 +8,8 @@ Programming: MATLAB, Python (Pytorch)
 
 ## Preprocessing with SHT
 Please first download the HUTUBS dataset and unzip all sub-folders into this repo.
-We will use `HRIR` and 
+We will use `HRIR` and `Antrhopometric measures` sub-folders.
+
 ## Deep learning model
 ### Dependencies
 
