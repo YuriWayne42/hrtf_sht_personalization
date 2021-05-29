@@ -2,7 +2,6 @@ import scipy.io as sio
 from torch.utils.data import Dataset
 import numpy as np
 import pandas as pd
-from utils import *
 
 
 class HUTUBS(Dataset):
@@ -12,9 +11,7 @@ class HUTUBS(Dataset):
         anthro = pd.read_csv(args.anthro_mat_path)
         self.val = val
         self.norm_anthro = args.norm_anthro
-
         self.anthro_mat = np.array(anthro)[np.array(valid_hrtf_index), 1:].astype(np.float64)
-
         self.anthro_mat_val = self.anthro_mat[[args.val_idx]]
         self.anthro_mat_train = np.delete(self.anthro_mat, args.val_idx, axis=0)
 
@@ -31,12 +28,12 @@ class HUTUBS(Dataset):
         self.anthro_mat_X_val = self.anthro_mat_val[:, :13]
         self.anthro_mat_D_L_val = self.anthro_mat_val[:, 13:25]
         self.anthro_mat_D_R_val = self.anthro_mat_train[:, 25:]
-        hrtf_mat = np.expand_dims(sio.loadmat(args.hrtf_SHT_mat_path)["HRTF_dBmat"], -2)
+        hrtf_mat = np.expand_dims(sio.loadmat(args.hrtf_SHT_mat_path)["HRTF_freq_alldB"], -2)
         self.hrtf_mat = hrtf_mat[valid_hrtf_index]
 
         self.hrtf_mat_val = self.hrtf_mat[[args.val_idx]]
         self.hrtf_mat_train = np.delete(self.hrtf_mat, args.val_idx, axis=0)
-        sht_mat = np.expand_dims(sio.loadmat(args.hrtf_SHT_mat_path)["SHT_dBmat"], -2)
+        sht_mat = np.expand_dims(sio.loadmat(args.hrtf_SHT_mat_path)["hrtf_SHT_dBmat"], -2)
 
         self.sht_mat = sht_mat[valid_hrtf_index]
 

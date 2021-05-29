@@ -11,25 +11,12 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm, trange
 import random
 import distutils
-from dataset_ import *
-from utils import *
-from model_ import *
-import pytorch_ssim
-from lpips_pytorch import LPIPS
+from dataset import *
+from model import *
 from pytorch_model_summary import summary
 
-def reconLoss(input_sht, target_sht, gt_hrtf, shvec):
-    mse = torch.nn.MSELoss()
-    shvec = shvec.float().to(input_sht.device).unsqueeze(0).repeat(input_sht.shape[0], 1, 1)
-    recon = mse(torch.bmm(shvec, input_sht), gt_hrtf)
-    return recon
-
-def mseLossPlusRecon(input_sht, target_sht, gt_hrtf, shvec):
-    mse = torch.nn.MSELoss()
-    mse_loss = mse(input_sht, target_sht)
-    shvec = shvec.float().to(input_sht.device).unsqueeze(0).repeat(input_sht.shape[0], 1, 1)
-    recon = mse(torch.bmm(shvec, input_sht), gt_hrtf)
-    return mse_loss + recon
+def str2bool(v):
+    return bool(distutils.util.strtobool(v))
 
 def initParams():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -37,14 +24,14 @@ def initParams():
     parser.add_argument('--seed', type=int, help="random number seed", default=688)
 
     # Data folder prepare
-    parser.add_argument("-o", "--out_fold", type=str, help="output folder", required=True, default='./models/try/')
+    parser.add_argument("-o", "--out_fold", type=str, help="output folder", required=True, default='./models/hrtf_sht/')
 
     # Dataset parameters
     parser.add_argument("-a", "--anthro_mat_path", type=str, default='/data/neil/HRTF/AntrhopometricMeasures.csv')
     parser.add_argument("-t", "--hrtf_SHT_mat_path", type=str,
-                        default='/data/neil/HRTF/HUTUBS_matrix_measured.mat')
+                        default='../sht_preprocessing/HUTUBS_matrix_measured.mat')
     parser.add_argument("-v", "--shvec_path", type=str,
-                        default='/data/neil/HRTF/SH_vec_matrix.mat')
+                        default='../sht_preprocessing/SH_vec_matrix.mat')
     parser.add_argument("-i", "--val_idx", type=int, default=0, help="index for Leave-one-out validation")
     parser.add_argument("--norm_anthro", type=str2bool, nargs='?', const=True, default=True,
                         help="whether to normalize anthro measures.")
@@ -233,7 +220,7 @@ def train(args):
         print('Train loss: %.5f, Val loss: %.5f' % (trainLoss, valLoss))
 
         if ((epoch_num + 1) % 1) == 0:
-            torch.save(generator.state_dict(), os.path.join(args.out_fold, 'checkpoint', 'generator_epoch%d_train%.3f_val%.3f.pt' % (epoch_num+1, trainLoss, valLoss)))
+            torch.save(model.state_dict(), os.path.join(args.out_fold, 'checkpoint', 'generator_epoch%d_train%.3f_val%.3f.pt' % (epoch_num+1, trainLoss, valLoss)))
 
         if valLoss < prev_loss:
             torch.save(model.state_dict(), os.path.join(args.out_fold, 'model.pt'))
@@ -254,6 +241,7 @@ def calLSD(gen_sht, gt_sht, gt_hrtf, shvec, use_linear):
         gen_hrtf = 20 * torch.log(gen_hrtf)
         gt_hrtf = 20 * torch.log(gt_hrtf)
     recon_lsd = rmse(gen_hrtf, gt_hrtf)
+    # the frontal direction
     recon_lsd00 = rmse(gen_hrtf[:, 202, :], gt_hrtf[:, 202, :])
     lsd_recon = rmse(gen_hrtf, recon_hrtf)
     return recon_lsd, recon_lsd00, lsd_recon
