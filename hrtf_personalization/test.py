@@ -6,10 +6,9 @@ import random
 import os
 
 num_of_subjects = 93
-num_epochs = 1000
 
 for j in tqdm(range(num_of_subjects)):
-    os.system("python train.py -o /data2/neil/HRTF_AES/models/hrtf_sht%02d -i %d --gpu %d --num_epochs %d" %(j, j, (2 + j % 2), 10))
+    os.system("python train.py -o /data2/neil/HRTF_AES/models/hrtf_sht%02d -i %d --gpu %d" %(j, j, (2 + j % 2)))
 
 model_dir = "/data2/neil/HRTF_AES/models/hrtf_sht"
 hrtf_SHT_mat_path = "../sht_preprocessing/HUTUBS_matrix_measured.mat"
