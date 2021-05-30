@@ -133,9 +133,6 @@ def initParams():
     with open(os.path.join(args.out_fold, 'test_loss.log'), 'w') as file:
         file.write("Start recording test loss ...\n")
 
-    if not os.path.exists(os.path.join(args.out_fold, 'pic')):
-        os.makedirs(os.path.join(args.out_fold, 'pic'))
-
     args.cuda = torch.cuda.is_available()
     print('Cuda device available: ', args.cuda)
     args.shvec = torch.from_numpy(sio.loadmat(args.shvec_path)["SH_Vec_matrix"])
@@ -168,11 +165,9 @@ def train(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr,
                                    betas=(args.beta_1, args.beta_2), eps=args.eps, weight_decay=0.0005)
     prev_loss = 1e8
-    early_stop_cnt = 0
 
     for epoch_num in tqdm(range(args.num_epochs)):
         model.train()
-
         trainlossDict = defaultdict(list)
         adjust_learning_rate(args, args.lr, optimizer, epoch_num)
 
@@ -188,23 +183,21 @@ def train(args):
 
             optimizer.zero_grad()
 
-            # Generate a batch of hrtf
+            # Generate a batch of sht
             gen_sht = model(ear_anthro, head_anthro, frequency, left_or_right)
 
             if args.target == "hrtf":
-                recon_loss = metric(gen_sht, hrtf)
+                loss = metric(gen_sht, hrtf)
             else:
-                recon_loss = metric(gen_sht, sht)
+                loss = metric(gen_sht, sht)
 
-            loss = recon_loss
-            trainlossDict["recon"].append(recon_loss.item())
             trainlossDict["gen_l"].append(loss.item())
             loss.backward()
             optimizer.step()
 
             with open(os.path.join(args.out_fold, "train_loss.log"), "a") as log:
                 log.write(str(epoch_num) + "\t" + str(i) + "\t"
-                          + str(trainlossDict["recon"][-1]) + "\t"
+                          + str(trainlossDict["gen_l"][-1]) + "\t"
                           + "\n")
 
         vallossDict = defaultdict(list)
@@ -220,13 +213,10 @@ def train(args):
 
                 gen_sht = model(ear_anthro, head_anthro, frequency, left_or_right)
                 if args.target == "hrtf":
-                    recon_loss = metric(gen_sht, hrtf)
+                    loss = metric(gen_sht, hrtf)
                 else:
-                    recon_loss = metric(gen_sht, sht)
+                    loss = metric(gen_sht, sht)
 
-                loss = recon_loss
-
-                vallossDict["recon"].append(recon_loss.item())
                 vallossDict["gen_l"].append(loss.item())
 
         with open(os.path.join(args.out_fold, "dev_loss.log"), "a") as log:
@@ -234,7 +224,7 @@ def train(args):
                       + str(np.nanmean(vallossDict["recon"])) + "\t"
                       + "\n")
 
-        trainLoss = np.mean(trainlossDict['disc_l']+trainlossDict['gen_l'])
+        trainLoss = np.mean(trainlossDict['gen_l'])
         valLoss = np.mean(vallossDict['gen_l'])
 
         print('Train loss: %.5f, Val loss: %.5f' % (trainLoss, valLoss))
@@ -246,25 +236,44 @@ def train(args):
             torch.save(model.state_dict(), os.path.join(args.out_fold, 'model.pt'))
             print("Model is saved to: ", os.path.join(args.out_fold, 'model.pt'))
             prev_loss = valLoss
-            early_stop_cnt = 0
-        else:
-            early_stop_cnt += 1
+
+    model.eval()
+    with torch.no_grad():
+        sht_array = []
+        gen_sht_array = []
+
+        for i, (ear_anthro, head_anthro, hrtf, sht, subject, freq, left_or_right) in enumerate(
+                tqdm(valDataLoader)):
+            ear_anthro = ear_anthro.float().to(args.device)
+            head_anthro = head_anthro.float().to(args.device)
+            hrtf = hrtf.float().to(args.device)
+            sht = sht.float().to(args.device)
+            frequency = freq.to(args.device)
+            left_or_right = left_or_right.to(args.device)
+
+            gen_sht = model(ear_anthro, head_anthro, frequency, left_or_right)
+
+            sht_array.append(sht.squeeze(0).cpu())
+            gen_sht_array.append(gen_sht.squeeze(0).cpu())
+
+        sht_array = torch.cat(sht_array)
+        sht_array = torch.cat(torch.split(sht_array, [sht_array.shape[0] // 2, sht_array.shape[0] // 2], dim=0), dim=2)
+        gen_sht_array = torch.cat(gen_sht_array)
+        gen_sht_array = torch.cat(
+            torch.split(gen_sht_array, [gen_sht_array.shape[0] // 2, gen_sht_array.shape[0] // 2], dim=0), dim=2)
+        sio.savemat(os.path.join(args.out_fold, "result_%02d.mat" % args.val_idx),
+                    {"sht_array": sht_array.numpy(), "gen_sht_array": gen_sht_array.numpy()})
+
 
 if __name__ == "__main__":
     args = initParams()
-    shvec = torch.from_numpy(sio.loadmat("/data/neil/HRTF/SH_vec_matrix.mat")["SH_Vec_matrix"])
 
     ear_anthro = torch.rand((128, 12))
     head_anthro = torch.rand((128, 13))
     frequency = torch.LongTensor(np.random.randint(0, 41, 128))
     left_or_right = torch.LongTensor(np.random.randint(0, 2, 128))
-    model = ConvNNHrtfSht(args)
-
-    output = model(ear_anthro, head_anthro, frequency, left_or_right)
-    print(output.shape)
 
     print(summary(ConvNNHrtfSht(args), ear_anthro, head_anthro, frequency, left_or_right, show_input=False))
 
     if not args.test_only:
         train(args)
-    test(args)
