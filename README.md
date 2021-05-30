@@ -23,11 +23,15 @@ Please take care of the arguments in `train.py`, especially specify the `anthro_
 
 For each training-evaluation round in a leave-one-out manner, we use the following command to train the model. The option `i` is to specify which subject you want to exclude in the training.
 ```
-python train.py -o /data2/neil/HRTF_GAN/models/hrtf_sht%02d -i %d
+python train.py -o /data2/neil/HRTF_AES/models/hrtf_sht%02d -i %d
 ```
 For the complete training command, which iterate through all subjects, please refer to `test.py`.
 
 ### Test the pretrained model
+```
+python test.py
+```
+We included the core code for calculating our reported results.
 
 ## Citation
 ```

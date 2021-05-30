@@ -67,7 +67,7 @@ def initParams():
     # Dataset prepare
     parser.add_argument("--ear_anthro_dim", type=int, help="ear anthro dimension", default=12)
     parser.add_argument("--head_anthro_dim", type=int, help="head anthro dimension", default=13)
-    parser.add_argument("--freq_bin", type=int, help="number of frequency bin", default=128)
+    parser.add_argument("--freq_bin", type=int, help="number of frequency bin", default=41)
 
     # Training prepare
     parser.add_argument("--ear_emb_dim", type=int, help="ear embedding dimension", default=32)
