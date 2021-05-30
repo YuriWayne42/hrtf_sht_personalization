@@ -18,6 +18,31 @@ from pytorch_model_summary import summary
 def str2bool(v):
     return bool(distutils.util.strtobool(v))
 
+def setup_seed(random_seed, cudnn_deterministic=True):
+    """ set_random_seed(random_seed, cudnn_deterministic=True)
+
+    Set the random_seed for numpy, python, and cudnn for reproducibility
+
+    input
+    -----
+      random_seed: integer random seed
+      cudnn_deterministic: for torch.backends.cudnn.deterministic
+
+    Note: this default configuration may result in RuntimeError
+    see https://pytorch.org/docs/stable/notes/randomness.html
+    """
+
+    # initialization
+    torch.manual_seed(random_seed)
+    random.seed(random_seed)
+    np.random.seed(random_seed)
+    os.environ['PYTHONHASHSEED'] = str(random_seed)
+
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(random_seed)
+        # torch.backends.cudnn.deterministic = cudnn_deterministic
+        # torch.backends.cudnn.benchmark = False
+
 def initParams():
     parser = argparse.ArgumentParser(description=__doc__)
 
@@ -42,7 +67,7 @@ def initParams():
     # Dataset prepare
     parser.add_argument("--ear_anthro_dim", type=int, help="ear anthro dimension", default=12)
     parser.add_argument("--head_anthro_dim", type=int, help="head anthro dimension", default=13)
-    parser.add_argument("--freq_bin", type=int, help="number of frequency bin", default=41)
+    parser.add_argument("--freq_bin", type=int, help="number of frequency bin", default=128)
 
     # Training prepare
     parser.add_argument("--ear_emb_dim", type=int, help="ear embedding dimension", default=32)
@@ -53,7 +78,7 @@ def initParams():
     parser.add_argument("--condition_dim", type=int, default=256, help="dimension of encoded conditions")
 
     # Training hyperparameters
-    parser.add_argument('--num_epochs', type=int, default=2000, help="Number of epochs for training")
+    parser.add_argument('--num_epochs', type=int, default=1000, help="Number of epochs for training")
     parser.add_argument('--batch_size', type=int, default=1024, help="Mini batch size for training")
     parser.add_argument("--lr", type=float, default=0.0005, help="adam learning rate")
     parser.add_argument('--lr_decay', type=float, default=0.8, help="decay learning rate")
@@ -138,9 +163,7 @@ def train(args):
     # Loss functions
     metric = torch.nn.MSELoss()
 
-    criterion = nn.BCEWithLogitsLoss()
     model = ConvNNHrtfSht(args).to(args.device)
-
     model.apply(init_weights)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr,
                                    betas=(args.beta_1, args.beta_2), eps=args.eps, weight_decay=0.0005)
@@ -185,7 +208,7 @@ def train(args):
                           + "\n")
 
         vallossDict = defaultdict(list)
-        generator.eval()
+        model.eval()
         with torch.no_grad():
             for i, (ear_anthro, head_anthro, hrtf, sht, subject, freq, left_or_right) in enumerate(tqdm(valDataLoader)):
                 ear_anthro = ear_anthro.float().to(args.device)
@@ -195,10 +218,7 @@ def train(args):
                 frequency = freq.to(args.device)
                 left_or_right = left_or_right.to(args.device)
 
-                noise_dist = torch.distributions.normal.Normal(0, 1)
-                noise = noise_dist.sample((frequency.shape[0], args.noise_dim)).to(args.device)
-
-                gen_sht = generator(noise, ear_anthro, head_anthro, frequency, left_or_right)
+                gen_sht = model(ear_anthro, head_anthro, frequency, left_or_right)
                 if args.target == "hrtf":
                     recon_loss = metric(gen_sht, hrtf)
                 else:
@@ -230,88 +250,6 @@ def train(args):
         else:
             early_stop_cnt += 1
 
-def rmse(first, second):
-    return torch.sqrt(torch.mean((first - second) **2))
-
-def calLSD(gen_sht, gt_sht, gt_hrtf, shvec, use_linear):
-    shvec = shvec.float().to(gen_sht.device).unsqueeze(0).repeat(gen_sht.shape[0], 1, 1)
-    gen_hrtf = torch.bmm(shvec, gen_sht)
-    recon_hrtf = torch.bmm(shvec, gt_sht)
-    if use_linear:
-        gen_hrtf = 20 * torch.log(gen_hrtf)
-        gt_hrtf = 20 * torch.log(gt_hrtf)
-    recon_lsd = rmse(gen_hrtf, gt_hrtf)
-    # the frontal direction
-    recon_lsd00 = rmse(gen_hrtf[:, 202, :], gt_hrtf[:, 202, :])
-    lsd_recon = rmse(gen_hrtf, recon_hrtf)
-    return recon_lsd, recon_lsd00, lsd_recon
-
-def test(args):
-    eval_set = HUTUBS(args, val=True)
-    evalDataLoader = DataLoader(eval_set, batch_size=args.batch_size // 32, shuffle=False)
-
-    # Loss functions
-    mse_loss = torch.nn.MSELoss().to(args.device)
-
-    # Initialize generator and discriminator
-    model = ConvNNHrtfSht(args).to(args.device)
-    model.load_state_dict(
-        torch.load(os.path.join(args.out_fold, 'generator.pt'), map_location="cuda" if args.cuda else "cpu"),
-        strict=False)
-    model.eval()
-
-    with torch.no_grad():
-        sht_array = []
-        gen_sht_array = []
-        hrtf_array = []
-
-        recon_loss_array = []
-        for i, (ear_anthro, head_anthro, hrtf, sht, subject, freq, left_or_right) in enumerate(
-                tqdm(evalDataLoader)):
-            ear_anthro = ear_anthro.float().to(args.device)
-            head_anthro = head_anthro.float().to(args.device)
-            hrtf = hrtf.float().to(args.device)
-            sht = sht.float().to(args.device)
-            frequency = freq.to(args.device)
-            left_or_right = left_or_right.to(args.device)
-
-            noise_dist = torch.distributions.normal.Normal(0, 1)
-            noise = noise_dist.sample((frequency.shape[0], args.noise_dim)).to(args.device)
-
-            gen_sht = generator(noise, ear_anthro, head_anthro, frequency, left_or_right)
-
-            if args.target == "hrtf":
-                recon_loss = mse_loss(gen_sht, hrtf)
-            else:
-                recon_loss = mse_loss(gen_sht, sht)
-
-            recon_loss_array.append(recon_loss.item())
-
-            # hrtf_recon = calLSD(gen_sht, hrtf, args.shvec)
-
-            sht_array.append(sht.squeeze(0).cpu())
-            gen_sht_array.append(gen_sht.squeeze(0).cpu())
-            hrtf_array.append(hrtf.squeeze(0).cpu())
-            plt.close()
-
-    sht_array = torch.cat(sht_array)
-    sht_array = torch.cat(torch.split(sht_array, [sht_array.shape[0]//2, sht_array.shape[0]//2], dim=0), dim=2)
-
-    gen_sht_array = torch.cat(gen_sht_array)
-    gen_sht_array = torch.cat(torch.split(gen_sht_array, [gen_sht_array.shape[0]//2, gen_sht_array.shape[0]//2], dim=0), dim=2)
-
-    hrtf_array = torch.cat(hrtf_array)
-    hrtf_array = torch.cat(torch.split(hrtf_array, [hrtf_array.shape[0]//2, hrtf_array.shape[0]//2], dim=0), dim=2)
-
-    if args.target == "hrtf":
-        print(rmse(gen_sht_array, hrtf_array).item())
-    else:
-        lsd, lsd00, lsd_recon = calLSD(gen_sht_array, sht_array, hrtf_array, args.shvec, args.use_linear)
-        print("LSD:", lsd.item(), "LSD00:", lsd00.item(), "LSDrecon:", lsd_recon.item())
-
-    sio.savemat(os.path.join(args.out_fold, "result_%02d.mat" % args.val_idx),
-                {"sht_array": sht_array.numpy(), "gen_sht_array": gen_sht_array.numpy()})
-
 if __name__ == "__main__":
     args = initParams()
     shvec = torch.from_numpy(sio.loadmat("/data/neil/HRTF/SH_vec_matrix.mat")["SH_Vec_matrix"])
@@ -323,6 +261,7 @@ if __name__ == "__main__":
     model = ConvNNHrtfSht(args)
 
     output = model(ear_anthro, head_anthro, frequency, left_or_right)
+    print(output.shape)
 
     print(summary(ConvNNHrtfSht(args), ear_anthro, head_anthro, frequency, left_or_right, show_input=False))
 

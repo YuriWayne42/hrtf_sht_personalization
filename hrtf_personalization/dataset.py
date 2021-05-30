@@ -28,7 +28,7 @@ class HUTUBS(Dataset):
         self.anthro_mat_X_val = self.anthro_mat_val[:, :13]
         self.anthro_mat_D_L_val = self.anthro_mat_val[:, 13:25]
         self.anthro_mat_D_R_val = self.anthro_mat_train[:, 25:]
-        hrtf_mat = np.expand_dims(sio.loadmat(args.hrtf_SHT_mat_path)["HRTF_freq_alldB"], -2)
+        hrtf_mat = np.expand_dims(sio.loadmat(args.hrtf_SHT_mat_path)["hrtf_freq_allDB"], -2)
         self.hrtf_mat = hrtf_mat[valid_hrtf_index]
 
         self.hrtf_mat_val = self.hrtf_mat[[args.val_idx]]

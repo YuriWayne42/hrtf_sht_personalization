@@ -88,8 +88,7 @@ class ConvNNHrtfSht(nn.Module):
         frequency_encoding = self.freq_enc(frequency)
         left_or_right_enc = self.lr_enc(left_or_right)
 
-        latent = torch.cat((ear_anthro_encoding, head_anthro_encoding,
-                            frequency_encoding), dim=1)
+        latent = torch.cat((ear_anthro_encoding, head_anthro_encoding, frequency_encoding), dim=1)
         latent = torch.cat((latent, left_or_right_enc), dim=1)
         latent = self.unsqueeze_condition(self.fc(latent))
 
