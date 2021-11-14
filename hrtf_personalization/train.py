@@ -52,7 +52,7 @@ def initParams():
     parser.add_argument("-o", "--out_fold", type=str, help="output folder", required=True, default='./models/hrtf_sht/')
 
     # Dataset parameters
-    parser.add_argument("-a", "--anthro_mat_path", type=str, default='/data/neil/HRTF/AntrhopometricMeasures.csv')
+    parser.add_argument("-a", "--anthro_mat_path", type=str, default='../sht_preprocessing/AntrhopometricMeasures.csv')
     parser.add_argument("-t", "--hrtf_SHT_mat_path", type=str,
                         default='../sht_preprocessing/HUTUBS_matrix_measured.mat')
     parser.add_argument("-v", "--shvec_path", type=str,
@@ -87,7 +87,7 @@ def initParams():
     parser.add_argument('--beta_1', type=float, default=0.9, help="bata_1 for Adam")
     parser.add_argument('--beta_2', type=float, default=0.999, help="beta_2 for Adam")
     parser.add_argument('--eps', type=float, default=1e-8, help="epsilon for Adam")
-    parser.add_argument("--gpu", type=str, help="GPU index", default="1")
+    parser.add_argument("--gpu", type=str, help="GPU index", default="0")
     parser.add_argument('--num_workers', type=int, default=0, help="number of workers")
 
     parser.add_argument('--norm', type=str, default='layer', choices=['batch', 'layer', 'instance'],
