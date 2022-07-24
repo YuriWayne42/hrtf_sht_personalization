@@ -1,8 +1,15 @@
 # Global HRTF personalization using Anthropometric Measurements (AES 2021)
 
-[Paper link][2]
+[[Paper link][2]] [[PDF][3]]
 
 Authors: Yuxiang Wang, You Zhang, Zhiyao Duan, Mark Bocko
+
+In this paper, we propose an approach for global HRTF personalization employing subjects’ anthropometric features using spherical harmonics transform (SHT) and convolutional neural network (CNN).
+Existing methods employ different models for each elevation, which fails to take advantage of the underlying common features of the full set of HRTF’s. 
+Using the HUTUBS HRTF database as our training set, 
+a SHT was used to produce subjects’ personalized HRTF’s for all spatial directions using a single model.  
+The resulting predicted HRTFs have a log-spectral distortion (LSD) level of 3.81 dB in comparison to the SHT reconstructed HRTFs, and 4.74 dB in comparison to the measured HRTFs. The personalized HRTFs show significant improvement upon 
+the finite element acoustic computations of HRTFs provided in the HUTUBS database.
 
 ## Basic information
 Dataset: HUTUBS [[download here][1]]
@@ -51,3 +58,4 @@ month={may},}
 
 [1]: https://depositonce.tu-berlin.de/handle/11303/9429
 [2]: https://www.aes.org/e-lib/browse.cfm?elib=21095
+[3]: https://labsites.rochester.edu/air/publications/Wang21HRTF.pdf
